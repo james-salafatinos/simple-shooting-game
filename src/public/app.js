@@ -3,15 +3,25 @@ import * as THREE from "/modules/three.module.js";
 import Stats from "/modules/stats.module.js";
 //Internal Libraries
 import { NoClipControls } from "/utils/NoClipControls.js";
-import { PhysicsObject } from "/utils/PhysicsObject.js";
+import { Crosshair } from "/utils/Crosshair.js";
+import { ProjectileGenerator } from "/utils/ProjectileGenerator.js";
+import { DelaunayGenerator } from "/utils/DelaunayGenerator.js";
+import { Targets } from "/utils/Targets.js";
+import { Octree } from "/modules/Octree.js";
 
 //THREE JS
-let camera, scene, renderer, composer, controls;
-let stats;
+let camera, scene, renderer, stats;
 //Required for NOCLIPCONTROLS
 let prevTime = performance.now();
-let physicsObjects = [];
+
+let controls, crosshair, projectileGenerator, delaunayGenerator, targets;
+
+//Octree Terrain
+let worldOctree;
+let octreeObjects = new THREE.Group();
 let frameIndex = 0;
+
+let walls = [];
 
 init();
 animate();
@@ -25,7 +35,7 @@ function init() {
     var loader = new THREE.TextureLoader(),
       texture = loader.load("/static/nightsky2.jpg");
     scene.background = texture;
-    scene.fog = new THREE.Fog(0xffffff, 100, 750);
+    // scene.fog = new THREE.Fog(0xffffff, 100, 750);
   };
   createScene();
 
@@ -65,17 +75,6 @@ function init() {
     camera.position.x = 10;
   };
   createCamera();
-
-  //##############################################################################
-  //Environment Controls
-  //##############################################################################
-
-  //NO CLIP CONTROLS
-  controls = new NoClipControls(window, camera, document);
-
-  //##############################################################################
-  //Create Static Objects
-  //##############################################################################
 
   let createPlane = function () {
     let mat = new THREE.MeshPhongMaterial({
@@ -128,50 +127,76 @@ function init() {
   };
   createStars();
 
-  //Large Star
-  let p0 = new PhysicsObject(10000, 0, 0, 0, 0, 0, 0, 0, 1);
-  p0.isStationary = true;
-  p0.density = 10000;
+  let createWall = function (_x, _y, _z) {
+    let geo = new THREE.BoxBufferGeometry(10, 10, 10);
+    let mat = new THREE.MeshPhongMaterial({
+      color: 0x00ff00,
+      wireframe: false,
+    });
+    let mesh = new THREE.Mesh(geo, mat);
+    mesh.position.x = _x || 60;
+    mesh.position.y = _y || 25;
+    mesh.position.z = _z || 0;
 
-  //Black Hole
-  physicsObjects.push(p0);
-  scene.add(p0.Sphere());
-
-  //PhyscsObject creation loop
-  for (let i = 0; i < 100; i++) {
-    let radius = 50;
-    let x_offset = 0;
-    let y_offset = 0;
-    let z_offset = 0;
-    let px = x_offset + (2 * Math.random() - 1) * radius;
-    let py = y_offset + (2 * Math.random() - 1) * radius;
-    let pz = z_offset + (2 * Math.random() - 1) * radius;
-    let physicsObject = new PhysicsObject(1, px, py, pz, 0, 0, 0, 0.01, 1);
-    physicsObjects.push(physicsObject);
-    scene.add(physicsObject.Sphere());
+    walls.push(mesh);
+    scene.add(mesh);
+  };
+  for (let i = 0; i < 10; i++) {
+    createWall(Math.random() * 100, Math.random() * 100, Math.random() * 100);
   }
+
+  //NO CLIP CONTROLS
+  controls = new NoClipControls(window, camera, document);
+  //Crosshair
+  crosshair = new Crosshair(scene, camera);
+
+  delaunayGenerator = new DelaunayGenerator(scene);
+  delaunayGenerator.createPoints();
+  delaunayGenerator.calculate();
+  worldOctree = new Octree();
+  let terrain = scene
+    .getObjectByProperty("uuid", delaunayGenerator.lastUUIDMesh_Texture)
+    .clone();
+  octreeObjects.add(terrain);
+
+  for (let i = 0; i < walls.length; i++) {
+    octreeObjects.add(walls[i].clone());
+  }
+
+  worldOctree.fromGraphNode(octreeObjects);
+
+  //Crosshair
+  targets = new Targets(scene, camera, worldOctree);
+
+  //Projectile Handler
+  projectileGenerator = new ProjectileGenerator(
+    scene,
+    camera,
+    window,
+    worldOctree,
+    targets.targets
+  );
+
+  //Initializing with DOM
+  // const score = document.getElementById("score");
+  // score.innerHTML = `Score: ${crosshair}`;
 }
 
+//##############################################################################
+//ANIMATE
+//##############################################################################
 function animate() {
-  //Frame Start up
   requestAnimationFrame(animate);
-
-  //Force Application
-  if (frameIndex % 1 == 0) {
-    for (let i = 0; i < physicsObjects.length; i++) {
-      for (let j = 0; j < physicsObjects.length; j++) {
-        if (i !== j) {
-          let f = physicsObjects[i].attract(physicsObjects[j]);
-          physicsObjects[i].applyForce(f);
-          physicsObjects[i].updatePhysics();
-          physicsObjects[i].updateGeometry();
-        }
-      }
-    }
-  }
-
   const time = performance.now();
+  //
   controls.update(time, prevTime);
+
+  worldOctree = new Octree();
+  //
+  crosshair.update();
+  projectileGenerator.update();
+  targets.update();
+
   renderer.render(scene, camera);
   stats.update();
 
