@@ -62,10 +62,10 @@ class Targets {
           result.normal.multiplyScalar(result.depth)
         );
       } else {
-        // s  elocity.y -= this.GRAVITY * deltaTime;
+        // elocity.y -= this.GRAVITY * deltaTime;
       }
 
-      const damping = Math.exp(-0.4 * deltaTime) - 1;
+      const damping = Math.exp(-0.9 * deltaTime) - 1;
       this.targets[i].velocity.addScaledVector(
         this.targets[i].velocity,
         damping

@@ -7,6 +7,7 @@ import { Crosshair } from "/utils/Crosshair.js";
 import { ProjectileGenerator } from "/utils/ProjectileGenerator.js";
 import { DelaunayGenerator } from "/utils/DelaunayGenerator.js";
 import { Targets } from "/utils/Targets.js";
+import { Holes } from "/utils/Holes.js";
 import { Octree } from "/modules/Octree.js";
 
 //THREE JS
@@ -14,7 +15,7 @@ let camera, scene, renderer, stats;
 //Required for NOCLIPCONTROLS
 let prevTime = performance.now();
 
-let controls, crosshair, projectileGenerator, delaunayGenerator, targets;
+let controls, crosshair, projectileGenerator, delaunayGenerator, targets, holes;
 
 //Octree Terrain
 let worldOctree;
@@ -165,7 +166,7 @@ function init() {
 
   worldOctree.fromGraphNode(octreeObjects);
 
-  //Crosshair
+  //Targets
   targets = new Targets(scene, camera, worldOctree);
 
   //Projectile Handler
@@ -176,6 +177,9 @@ function init() {
     worldOctree,
     targets.targets
   );
+
+  //Crosshair
+  holes = new Holes(scene, camera, targets.targets);
 
   //Initializing with DOM
   // const score = document.getElementById("score");
@@ -196,6 +200,8 @@ function animate() {
   crosshair.update();
   projectileGenerator.update();
   targets.update();
+
+  holes.update();
 
   renderer.render(scene, camera);
   stats.update();

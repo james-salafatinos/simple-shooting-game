@@ -140,7 +140,7 @@ class ProjectileGenerator {
             .multiplyScalar(normal.dot(target.velocity));
 
           s1.velocity.add(v2).sub(v1);
-          target.velocity.add(v1).sub(v2);
+          target.velocity.add(v1).sub(v2).multiplyScalar(0.4);
 
           const d = (r - Math.sqrt(d2)) / 2;
 
